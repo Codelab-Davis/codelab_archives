@@ -1,3 +1,7 @@
+export const dynamic = 'force-dynamic'
+
+import { archiveConfigured, publicItems } from 'lib/archive/public'
+import ArchiveEvent from '@/components/archive/ArchiveEvent'
 import 'css/prism.css'
 import 'katex/dist/katex.css'
 
@@ -26,6 +30,10 @@ export async function generateMetadata(props: {
 }): Promise<Metadata | undefined> {
   const params = await props.params
   const slug = decodeURI(params.slug.join('/'))
+  if (archiveConfigured()) {
+    const item = (await publicItems()).find((i) => i.kind === 'event' && i.published.slug === slug)
+    return item ? { title: item.published.title, description: item.published.summary } : undefined
+  }
   const post = allBlogs.find((p) => p.slug === slug)
   const authorList = post?.authors || ['default']
   const authorDetails = authorList.map((author) => {
@@ -73,13 +81,14 @@ export async function generateMetadata(props: {
   }
 }
 
-export const generateStaticParams = async () => {
-  return allBlogs.map((p) => ({ slug: p.slug.split('/').map((name) => decodeURI(name)) }))
-}
-
 export default async function Page(props: { params: Promise<{ slug: string[] }> }) {
   const params = await props.params
   const slug = decodeURI(params.slug.join('/'))
+  if (archiveConfigured()) {
+    const item = (await publicItems()).find((i) => i.kind === 'event' && i.published.slug === slug)
+    if (!item) return notFound()
+    return <ArchiveEvent content={item.published} />
+  }
   // Filter out drafts in production
   const sortedCoreContents = allCoreContent(sortPosts(allBlogs))
   const postIndex = sortedCoreContents.findIndex((p) => p.slug === slug)

@@ -14,6 +14,9 @@
 
 # next.js
 /.next/
+/.next-auth-test/
+/.next-smoke-test/
+/.next-workflow-test/
 /out/
 public/sitemap.xml
 .vercel
@@ -21,6 +24,8 @@ public/sitemap.xml
 # production
 /build
 *.xml
+!app/feed.xml/
+!app/tags/[[]tag]/feed.xml/
 
 # rss feed
 /public/feed.xml
@@ -45,3 +50,6 @@ yarn-error.log*
 
 # Contentlayer
 .contentlayer
+.env*
+!.env.example
+*.tsbuildinfo

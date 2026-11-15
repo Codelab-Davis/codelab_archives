@@ -20,6 +20,7 @@ interface ListLayoutProps {
   title: string
   initialDisplayPosts?: CoreContent<Blog>[]
   pagination?: PaginationProps
+  tagCounts?: Record<string, number>
 }
 
 function Pagination({ totalPages, currentPage }: PaginationProps) {
@@ -73,9 +74,9 @@ export default function ListLayoutWithTags({
   title,
   initialDisplayPosts = [],
   pagination,
+  tagCounts = tagData as Record<string, number>,
 }: ListLayoutProps) {
   const pathname = usePathname()
-  const tagCounts = tagData as Record<string, number>
   const tagKeys = Object.keys(tagCounts)
   const sortedTags = tagKeys.sort((a, b) => tagCounts[b] - tagCounts[a])
 
@@ -147,6 +148,7 @@ export default function ListLayoutWithTags({
                         src={images[0]}
                         alt={`Featured image for ${title}`}
                         fill
+                        unoptimized
                         className="object-cover"
                       />
                     </div>

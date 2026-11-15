@@ -47,6 +47,9 @@ export default function Footer() {
             <Link href="/projects" className="mb-2 block text-gray-500 hover:text-gray-700">
               Files
             </Link>
+            <Link href="/admin" className="mb-2 block text-gray-500 hover:text-gray-700">
+              Officer sign in
+            </Link>
           </div>
         </div>
 
