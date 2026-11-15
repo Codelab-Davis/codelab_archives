@@ -1,4 +1,15 @@
 const { withContentlayer } = require('next-contentlayer2')
+const { readdirSync, rmSync, existsSync } = require('fs')
+const path = require('path')
+
+// Older builds generated these ignored files in public/. Remove them before Next
+// scans public assets, otherwise they can shadow the request-time archive routes.
+for (const file of ['public/search.json', 'public/feed.xml']) rmSync(file, { force: true })
+if (existsSync('public/tags')) {
+  for (const tag of readdirSync('public/tags', { withFileTypes: true })) {
+    if (tag.isDirectory()) rmSync(path.join('public/tags', tag.name, 'feed.xml'), { force: true })
+  }
+}
 
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
@@ -66,6 +77,7 @@ module.exports = () => {
   return plugins.reduce((acc, next) => next(acc), {
     output,
     basePath,
+    distDir: process.env.ARCHIVE_NEXT_DIST_DIR || '.next',
     reactStrictMode: true,
     pageExtensions: ['ts', 'tsx', 'js', 'jsx', 'md', 'mdx'],
     eslint: {

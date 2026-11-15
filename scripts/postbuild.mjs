@@ -1,7 +1,1 @@
-import rss from './rss.mjs'
-
-async function postbuild() {
-  await rss()
-}
-
-postbuild()
+// Search and RSS are request-time routes, not static artifacts.

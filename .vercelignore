@@ -1,0 +1,10 @@
+.git
+.next*
+node_modules
+.env*
+!.env.example
+tests
+supabase
+docs
+AGENT_HANDOFF.md
+*.tsbuildinfo

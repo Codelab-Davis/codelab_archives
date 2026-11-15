@@ -31,16 +31,19 @@
     "strictNullChecks": true
   },
   "include": [
-    "next-env.d.ts",
     "**/*.js",
+    "**/*.json",
     "**/*.mjs",
     "**/*.ts",
     "**/*.tsx",
-    "**/*.json",
     ".contentlayer/generated",
     ".contentlayer/generated/**/*.json",
+    ".next-auth-test/types/**/*.ts",
+    ".next-smoke-test/types/**/*.ts",
     ".next/types/**/*.ts",
-    "app/**/*"
+    "app/**/*",
+    "next-env.d.ts",
+    ".next-workflow-test/types/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }
