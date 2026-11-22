@@ -20,7 +20,9 @@ const tests = (
   )
 ).flat()
 try {
-  const child = spawn(process.execPath, ['--test', ...tests], { stdio: 'inherit' })
+  // Integration tests start Next servers; avoid competing for CI runner resources.
+  const options = process.env.CI ? ['--test-concurrency=1'] : []
+  const child = spawn(process.execPath, ['--test', ...options, ...tests], { stdio: 'inherit' })
   const [code] = await once(child, 'exit')
   process.exitCode = code ?? 1
 } finally {
