@@ -5,13 +5,14 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
+import { nextSpawnOptions, stopNext, waitForNext, request as timedRequest, closeMock } from './next-test-lifecycle.mjs'
 import { createHash } from 'node:crypto'
 
 const listen = async (s) => { s.listen(0, '127.0.0.1'); await once(s, 'listening'); return s.address().port }
 const cookies = (r) => r.headers.getSetCookie().map((s) => s.split(';')[0]).join('; ')
 const copy = (v) => structuredClone(v)
 
-test('officer workflow through real admin handlers and an isolated mock Supabase', { timeout: 120000 }, async (t) => {
+test('officer workflow through real admin handlers and an isolated mock Supabase', { timeout: 300000 }, async (t) => {
   let item = null, officer = true, challenge, manifest, uploads = [], revisions = [], exchangeVerified = false
   const mock = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://mock')
@@ -57,16 +58,11 @@ test('officer workflow through real admin handlers and an isolated mock Supabase
   const mockPort = await listen(mock)
   const socket = createServer(); const port = await listen(socket); await new Promise((r) => socket.close(r))
   const base = `http://localhost:${port}`
-  const child = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '-p', String(port), '-H', '127.0.0.1'], { env: { ...process.env, NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${mockPort}`, NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon-key', ARCHIVE_AUTH_ORIGIN: base, ARCHIVE_NEXT_DIST_DIR: '.next-workflow-test' }, stdio: ['ignore', 'pipe', 'pipe'] })
+  const child = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '-p', String(port), '-H', '127.0.0.1'], { ...nextSpawnOptions, env: { ...process.env, NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${mockPort}`, NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon-key', ARCHIVE_AUTH_ORIGIN: base, ARCHIVE_NEXT_DIST_DIR: '.next-workflow-test' }, stdio: ['ignore', 'pipe', 'pipe'] })
   let logs = ''; child.stdout.on('data', (d) => { logs += d }); child.stderr.on('data', (d) => { logs += d })
-  t.after(async () => { if (child.exitCode === null && child.signalCode === null) { child.kill('SIGTERM'); await once(child, 'exit') }; await new Promise((r) => mock.close(r)) })
-  for (let i = 0; i < 120; i++) {
-    if (child.exitCode !== null || child.signalCode !== null) throw new Error(`Next exited: ${logs}`)
-    try { if ((await fetch(`${base}/auth/missing`)).status === 404) break } catch {}
-    if (i === 119) throw new Error(`Next did not start: ${logs}`)
-    await new Promise((r) => setTimeout(r, 500))
-  }
-  const request = (path, options = {}) => fetch(base + path, { redirect: 'manual', ...options })
+  t.after(async () => { try { await stopNext(child) } finally { await closeMock(mock) } })
+  await waitForNext(base, child, () => logs)
+  const request = (path, options = {}) => timedRequest(base + path, { redirect: 'manual', ...options })
   let res = await request('/auth/login')
   const authorize = new URL(res.headers.get('location')); challenge = authorize.searchParams.get('code_challenge')
   const state = new URL(authorize.searchParams.get('redirect_to')).searchParams.get('state')

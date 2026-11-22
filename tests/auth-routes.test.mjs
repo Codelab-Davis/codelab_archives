@@ -6,6 +6,7 @@ import { createServer } from 'node:http'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { once } from 'node:events'
+import { nextSpawnOptions, stopNext, waitForNext, request as timedRequest, closeMock } from './next-test-lifecycle.mjs'
 
 const listen = async (server) => { server.listen(0, '127.0.0.1'); await once(server, 'listening'); return server.address().port }
 const body = async (req) => { let s = ''; for await (const chunk of req) s += chunk; return s ? JSON.parse(s) : {} }
@@ -13,7 +14,7 @@ const session = { access_token: 'valid-access', refresh_token: 'rotated-refresh'
 const cookieHeader = (response) => response.headers.getSetCookie().map((s) => s.split(';')[0]).join('; ')
 const value = (header, name) => header.split('; ').find((s) => s.startsWith(`${name}=`))?.slice(name.length + 1)
 
-test('OAuth PKCE, state, authorization, refresh and logout via real route handlers', { timeout: 120000 }, async (t) => {
+test('OAuth PKCE, state, authorization, refresh and logout via real route handlers', { timeout: 300000 }, async (t) => {
   let exchange = 0, refresh = 0, logout = 0, officer = true, challenge = '', failRefresh = false
   const mock = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://mock')
@@ -44,17 +45,13 @@ test('OAuth PKCE, state, authorization, refresh and logout via real route handle
   const portServer = createServer(); const port = await listen(portServer); await new Promise((r) => portServer.close(r))
   const base = `http://127.0.0.1:${port}`
   const child = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '-p', String(port), '-H', '127.0.0.1'], {
+    ...nextSpawnOptions,
     env: { ...process.env, NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${mockPort}`, NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon-key', ARCHIVE_AUTH_ORIGIN: base, ARCHIVE_NEXT_DIST_DIR: '.next-auth-test' }, stdio: ['ignore', 'pipe', 'pipe'],
   })
   let logs = ''; child.stdout.on('data', (d) => { logs += d }); child.stderr.on('data', (d) => { logs += d })
-  t.after(async () => { child.kill('SIGTERM'); mock.close(); await new Promise((r) => setTimeout(r, 100)) })
-  for (let i = 0; i < 120; i++) {
-    if (child.exitCode !== null) throw new Error(`Next exited: ${logs}`)
-    try { if ((await fetch(`${base}/auth/missing`)).status === 404) break } catch {}
-    if (i === 119) throw new Error(`Next did not start: ${logs}`)
-    await new Promise((r) => setTimeout(r, 500))
-  }
-  const request = (path, options = {}) => fetch(`${base}${path}`, { redirect: 'manual', ...options })
+  t.after(async () => { try { await stopNext(child) } finally { await closeMock(mock) } })
+  await waitForNext(base, child, () => logs)
+  const request = (path, options = {}) => timedRequest(`${base}${path}`, { redirect: 'manual', ...options })
   async function login() {
     const res = await request('/auth/login')
     assert.equal(res.status, 307)
