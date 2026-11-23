@@ -8,7 +8,11 @@ const headers = {
 
 export async function GET(request: Request) {
   const path = new URL(request.url).searchParams.get('path') || ''
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[a-zA-Z0-9._-]{1,160}$/.test(path))
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[a-zA-Z0-9._-]{1,160}$/.test(
+      path
+    )
+  )
     return new Response(null, { status: 404, headers })
 
   const filename = path.slice(37)
@@ -31,9 +35,13 @@ export async function GET(request: Request) {
       redirect: 'error',
       signal: AbortSignal.timeout(15000),
     })
-    if (!object.ok) return new Response(null, { status: object.status === 404 ? 404 : 503, headers })
+    if (!object.ok)
+      return new Response(null, { status: object.status === 404 ? 404 : 503, headers })
     const type = object.headers.get('content-type')?.split(';')[0].trim() || ''
-    if (!object.body || !['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'].includes(type))
+    if (
+      !object.body ||
+      !['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'].includes(type)
+    )
       return new Response(null, { status: 404, headers })
     return new Response(object.body, {
       headers: {

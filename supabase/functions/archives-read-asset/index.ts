@@ -2,7 +2,8 @@ import { remark } from 'npm:remark@15.0.1'
 
 // Public delivery is gated by the current published snapshot, not an officer session.
 // Storage credentials are injected by Supabase and stay inside this function.
-const PATH_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[a-zA-Z0-9._-]{1,160}$/
+const PATH_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[a-zA-Z0-9._-]{1,160}$/
 const TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'])
 const noStore = {
   'Cache-Control': 'private, no-store, max-age=0',
@@ -13,8 +14,10 @@ const empty = (status: number) => new Response(null, { status, headers: noStore 
 
 type MarkdownNode = { type: string; url?: string; children?: MarkdownNode[] }
 function referencesAsset(node: MarkdownNode, canonical: string): boolean {
-  return (['link', 'image', 'definition'].includes(node.type) && node.url === canonical) ||
+  return (
+    (['link', 'image', 'definition'].includes(node.type) && node.url === canonical) ||
     Boolean(node.children?.some((child) => referencesAsset(child, canonical)))
+  )
 }
 
 async function parsePath(request: Request): Promise<string | null> {
@@ -27,20 +30,34 @@ async function parsePath(request: Request): Promise<string | null> {
     const { value, done } = await reader.read()
     if (done) break
     length += value.length
-    if (length > 2048) { await reader.cancel(); return null }
+    if (length > 2048) {
+      await reader.cancel()
+      return null
+    }
     chunks.push(value)
   }
   const bytes = new Uint8Array(length)
   let offset = 0
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length }
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.length
+  }
   try {
     const body = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
-    if (!body || typeof body !== 'object' || Array.isArray(body) ||
-        Object.keys(body).length !== 1 || typeof body.path !== 'string' ||
-        !PATH_PATTERN.test(body.path) ||
-        ['.', '..'].includes(body.path.split('/')[1])) return null
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 1 ||
+      typeof body.path !== 'string' ||
+      !PATH_PATTERN.test(body.path) ||
+      ['.', '..'].includes(body.path.split('/')[1])
+    )
+      return null
     return body.path
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 
 Deno.serve(async (request: Request) => {
@@ -71,18 +88,27 @@ Deno.serve(async (request: Request) => {
     const canonical = `/api/archive/asset?path=${encodeURIComponent(path)}`
     const referenced = snapshots.some((content) => {
       if (!content || typeof content !== 'object') return false
-      if ([content.coverImage, content.url, content.slidesUrl, content.videoUrl].includes(canonical)) return true
-      return typeof content.body === 'string' && referencesAsset(remark().parse(content.body) as MarkdownNode, canonical)
+      if (
+        [content.coverImage, content.url, content.slidesUrl, content.videoUrl].includes(canonical)
+      )
+        return true
+      return (
+        typeof content.body === 'string' &&
+        referencesAsset(remark().parse(content.body) as MarkdownNode, canonical)
+      )
     })
     if (!referenced) return empty(404)
 
     const encodedPath = path.split('/').map(encodeURIComponent).join('/')
-    const object = await fetch(`${base}/storage/v1/object/authenticated/archive-assets/${encodedPath}`, {
-      headers: auth,
-      cache: 'no-store',
-      redirect: 'error',
-      signal: AbortSignal.timeout(8000),
-    })
+    const object = await fetch(
+      `${base}/storage/v1/object/authenticated/archive-assets/${encodedPath}`,
+      {
+        headers: auth,
+        cache: 'no-store',
+        redirect: 'error',
+        signal: AbortSignal.timeout(8000),
+      }
+    )
     if (object.status === 404) return empty(404)
     if (!object.ok || !object.body) return empty(503)
     const type = object.headers.get('content-type')?.split(';')[0].trim().toLowerCase() || ''
@@ -94,5 +120,7 @@ Deno.serve(async (request: Request) => {
         'Content-Disposition': `attachment; filename="${path.slice(37)}"`,
       },
     })
-  } catch { return empty(503) }
+  } catch {
+    return empty(503)
+  }
 })
