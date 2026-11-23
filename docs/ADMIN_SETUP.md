@@ -16,15 +16,7 @@ The team Vercel project `codelabdavis-projects/codelab-archives` is connected to
 
 ## Database, content, and assets
 
-The hosted migration versions differ from the repository filenames, although the persisted SQL for each pair has matching SHA-256 after trimming whitespace and normalizing CRLF:
-
-| Hosted version | Repository migration |
-| --- | --- |
-| `20261115084029` (`archives`) | `20261114000000_archives.sql` |
-| `20261115084037` (`published_assets`) | `20261115000000_published_assets.sql` |
-| `20261123065027` (`archive_asset_delivery`) | `20261123064736_archive_asset_delivery.sql` |
-
-Hold automated hosted migration pushes until the version histories are deliberately aligned and reviewed. Do not edit migration history as a routine fix. Verify the target and migration plan before any future hosted change.
+The four migration filenames match the history of the designated hosted Supabase project. The SQL is identical after normalizing line endings and trimming outer whitespace. Before applying a new migration, verify the target project and compare its migration history with the repository. If a local database used the previous filenames, rebuild disposable local databases from the current migrations. For any database with data to retain, reconcile the migration history after verifying the applied SQL before running another migration.
 
 The private `archive-assets` bucket allows officer uploads and reads. Replacements use new paths. The `archive_asset_delivery` migration removes direct public object reads. Deploy the `archives-read-asset` Supabase Edge Function before deploying the updated Next app. Register the function with JWT verification enabled for the current legacy anon key. The app sends that key to the function. The function uses its Supabase-injected credential to look up the current published snapshot, check the exact attachment reference, and stream eligible bytes. The Next route and function both disable response caching. The Vercel app requires only the existing public Supabase settings.
 
@@ -46,7 +38,7 @@ Run `PGBIN=/path/to/postgresql/bin bash tests/security/run.sh` for the disposabl
 - Google authorized redirect URI: `https://tnebgoednnsnaloavypi.supabase.co/auth/v1/callback` (Google returns to Supabase here; Supabase then redirects to the application callback above)
 - For an external Google OAuth app in testing mode, add the intended officer accounts as Google test users.
 
-The release-candidate callback and browser acceptance test remain pending. The existing MCP grant can manage database and storage but lacks `auth_config_read` and `auth_config_write` management permissions. Configure Auth in the Supabase dashboard or use an authorized management credential.
+The release-candidate callback and officer sign-in passed on the protected preview. A real Google sign-in by a user outside the officer allowlist is still pending. Configure hosted Auth in the Supabase dashboard or with an authorized management credential.
 
 ## Preview, release, and recovery
 
@@ -55,7 +47,7 @@ The release-candidate callback and browser acceptance test remain pending. The e
 3. Retire the old personal staging deployment, remove its callback, and address its outstanding sessions before release. Verify the result. Configure the approved production URL and Auth origin, confirm backup and restore readiness, and obtain explicit approval before changing the live site or domain.
 4. Retain the prior live deployment and legacy source and record the rollback owner and steps. To roll back, restore the prior site deployment or domain routing after approval, preserve database revisions, and reconcile writes made since cutover. Database restoration requires a reviewed recovery point and downtime plan; back up Storage objects separately because database backups do not contain their bytes.
 
-`npm test` passes 17 tests covering mocked Auth/admin HTTP workflows, asset extraction, Markdown rendering and round trips, legacy migration conversion, and RSS. The local SQL harness checks RLS, verified officer identities, immutable history, draft/public isolation, conflicts, restore, and published-only asset access. Direct hosted anonymous REST checks confirmed published access and denial of draft tables, officer lists, revisions, manifests, and mutation RPCs. All 17 migrated event URLs returned HTTP 200 on staging. A temporary database fixture verified that draft content stays out of search/RSS, published content appears immediately in its page/search/RSS/sitemap, and archiving removes it from all four; the fixture was then removed, leaving the original 27 records. These are not a substitute for the first real officer login and hosted upload/publishing check.
+`npm test` passes 17 tests covering mocked Auth/admin HTTP workflows, asset extraction, Markdown rendering and round trips, legacy migration conversion, and RSS. The local SQL harness checks RLS, verified officer identities, immutable history, draft/public isolation, conflicts, restore, and published-only asset access. Direct hosted anonymous REST checks confirmed published access and denial of draft tables, officer lists, revisions, manifests, and mutation RPCs. All 17 migrated event URLs returned HTTP 200 on staging. A temporary database fixture verified that draft content stays out of search/RSS, published content appears immediately in its page/search/RSS/sitemap, and archiving removes it from all four; the fixture was then removed, leaving the original 27 records. A separate archived test fixture verified the signed-in officer upload, publish, unpublish, and restore workflow. The protected preview also returned HTTP 409 for a stale save and preserved the newer draft. The two synthetic Storage objects still require cleanup.
 
 Do not switch the production domain until real Google sign-in and the complete release-candidate workflow pass. Keep the old deployment and legacy source available for rollback. Apply SQL changes through reviewed migrations; never erase revision history as part of a rollback. Configure a database backup/export schedule and separate Storage object backup, with retention and a tested restore, before relying on the service for ongoing officer work. Supabase paid plans provide scheduled database backups; Free projects need regular off-site exports. See [Supabase backups](https://supabase.com/docs/guides/platform/backups).
 
