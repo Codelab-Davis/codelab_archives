@@ -1,20 +1,18 @@
 import { MetadataRoute } from 'next'
-import { allBlogs } from 'contentlayer/generated'
+import { publicPosts } from 'lib/archive/public'
 import siteMetadata from '@/data/siteMetadata'
 
-export const dynamic = 'force-static'
+export const dynamic = 'force-dynamic'
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = siteMetadata.siteUrl
 
-  const blogRoutes = allBlogs
-    .filter((post) => !post.draft)
-    .map((post) => ({
-      url: `${siteUrl}/${post.path}`,
-      lastModified: post.lastmod || post.date,
-    }))
+  const blogRoutes = (await publicPosts()).map((post) => ({
+    url: `${siteUrl}/${post.path.split('/').map(encodeURIComponent).join('/')}`,
+    lastModified: post.lastmod || post.date,
+  }))
 
-  const routes = ['', 'Workshops', 'blog', 'about'].map((route) => ({
+  const routes = ['', 'blog', 'projects', 'about'].map((route) => ({
     url: `${siteUrl}/${route}`,
     lastModified: new Date().toISOString().split('T')[0],
   }))

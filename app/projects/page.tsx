@@ -1,4 +1,7 @@
-import projectsData, { FileType } from '@/data/projectsData'
+export const dynamic = 'force-dynamic'
+
+import { FileType } from '@/data/projectsData'
+import { publicFiles } from 'lib/archive/public'
 import { genPageMetadata } from 'app/seo'
 import ListLayoutWithFiles from '@/components/layouts/ListLayoutWithFiles'
 import { IconType } from 'react-icons'
@@ -16,8 +19,8 @@ interface ProjectFile {
   url?: string
 }
 
-export default function Projects() {
-  const files = projectsData
+export default async function Projects() {
+  const files = await publicFiles()
   const pageNumber = 1
   const totalPages = Math.ceil(files.length / FILES_PER_PAGE)
   const initialDisplayFiles = files.slice(0, FILES_PER_PAGE * pageNumber)
