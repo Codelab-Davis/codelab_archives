@@ -1,6 +1,7 @@
 -- Minimal Supabase-like roles and tables. This is not a Storage/Auth HTTP emulator.
 create role anon nologin;
 create role authenticated nologin;
+create role service_role nologin;
 create schema auth;
 create schema storage;
 grant usage on schema auth, storage to anon, authenticated;

@@ -45,5 +45,5 @@
     "next-env.d.ts",
     ".next-workflow-test/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "supabase/functions"]
 }

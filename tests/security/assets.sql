@@ -20,14 +20,32 @@ select public.archives_publish(id,version,array['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaa
 reset role;
 set role anon;
 select public.test_assert(public.archives_asset_is_published('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/photo.png'), 'published asset allowed');
-select public.test_assert((select count(*)=1 from storage.objects), 'only published storage object visible');
+select public.test_assert((select count(*)=0 from storage.objects), 'published storage object is not directly readable by anon');
 select public.test_assert(not public.archives_asset_is_published('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/draft.png'), 'unreferenced upload private');
 do $$ begin perform * from public.archive_published_assets; raise exception 'manifest exposed'; exception when insufficient_privilege then null; end $$;
+do $$ begin
+  perform public.archives_asset_publications('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/photo.png');
+  raise exception 'backend lookup exposed';
+exception when insufficient_privilege then null; end $$;
+reset role;
+set role service_role;
+select public.test_assert(
+  jsonb_array_length(public.archives_asset_publications('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/photo.png'))=1,
+  'backend lookup returns a current published snapshot for the referenced object'
+);
 reset role;
 set role authenticated;
+select public.test_assert((select count(*)=2 from storage.objects where bucket_id='archive-assets' and name in ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/photo.png','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/draft.png')), 'officer can directly read published and draft storage objects');
 select public.archives_set_status(id,'draft',2) from asset_fixture;
 reset role;
 set role anon;
+select public.test_assert(not public.archives_asset_is_published('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/photo.png'), 'unpublished asset fails publication predicate');
 select public.test_assert((select count(*)=0 from storage.objects), 'unpublished storage object private again');
+reset role;
+set role service_role;
+select public.test_assert(
+  public.archives_asset_publications('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/photo.png')='[]'::jsonb,
+  'backend lookup stops returning the snapshot after unpublish'
+);
 reset role;
 select 'published asset security tests passed' as result;

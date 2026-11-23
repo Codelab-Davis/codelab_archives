@@ -2,9 +2,9 @@
 
 ## Current status
 
-The existing Supabase project `codelab_archives` (`tnebgoednnsnaloavypi`) is designated as Archives production. It has both migrations and the legacy import applied: 27 imported records (17 events and 10 files). The initial UC Davis administrator is allowlisted. Do not modify the separate `codelab-app` project. The local `.env.local` is ignored by Git; do not commit it.
+The existing Supabase project `codelab_archives` (`tnebgoednnsnaloavypi`) is designated as Archives production. It has the archive migrations and legacy import applied, with 27 imported records (17 events and 10 files). The initial UC Davis administrator is allowlisted. Do not modify the separate `codelab-app` project. The local `.env.local` is ignored by Git.
 
-The team Vercel project `codelabdavis-projects/codelab-archives` is connected to GitHub with deployment protection enabled. Pull request previews use legacy content and have no shared Supabase credentials. The team staging branch is retired, and `main` is reserved for production. The personal staging deployment at https://codelab-archives-staging.vercel.app still serves the archive and must lose access to the production backend before release. The live cutover requires approval. Supabase records a confirmed Google officer sign-in, but a browser return to the editor and hosted editing have yet to be verified.
+The team Vercel project `codelabdavis-projects/codelab-archives` is connected to GitHub with deployment protection enabled. General pull request previews use legacy content. The team staging branch is retired, the personal staging deployment is paused, and `main` is reserved for production. An allowlisted officer signed in with Google and opened the hosted editor on the protected release-check preview. The live cutover requires approval.
 
 ## Authentication and environment
 
@@ -22,10 +22,13 @@ The hosted migration versions differ from the repository filenames, although the
 | --- | --- |
 | `20261115084029` (`archives`) | `20261114000000_archives.sql` |
 | `20261115084037` (`published_assets`) | `20261115000000_published_assets.sql` |
+| `20261123065027` (`archive_asset_delivery`) | `20261123064736_archive_asset_delivery.sql` |
 
 Hold automated hosted migration pushes until the version histories are deliberately aligned and reviewed. Do not edit migration history as a routine fix. Verify the target and migration plan before any future hosted change.
 
-The private `archive-assets` bucket allows officer uploads and reads; object replacement uses a new path. Anonymous Storage reads are limited by the published-asset manifest and published status; the application uses the anon key, not a service role. Publication writes the manifest with the snapshot; unpublishing removes access through the policy. Storage administrators can still change objects directly, so this is not tamper-proof archival storage. Verify deployed Storage behavior and MIME/size constraints in a controlled environment.
+The private `archive-assets` bucket allows officer uploads and reads. Replacements use new paths. The `archive_asset_delivery` migration removes direct public object reads. Deploy the `archives-read-asset` Supabase Edge Function before deploying the updated Next app. Register the function with JWT verification enabled for the current legacy anon key. The app sends that key to the function. The function uses its Supabase-injected credential to look up the current published snapshot, check the exact attachment reference, and stream eligible bytes. The Next route and function both disable response caching. The Vercel app requires only the existing public Supabase settings.
+
+Before release, verify direct Storage denial with a fresh test object while it is published. Confirm the same attachment URL through the app returns bytes when published and returns 404 after unpublish. Remove or purge any cached test objects previously exposed through the old policy. Changing an RLS policy does not invalidate existing CDN entries. See [Supabase Storage CDN guidance](https://supabase.com/docs/guides/storage/cdn/smart-cdn).
 
 The 27 legacy records are already imported into the designated production database; do not rerun the import for release. The importer `scripts/import-legacy-archive.mjs` skips existing identities and is not a synchronization mechanism for later edits, revisions, or assets. Once Supabase is configured, published database snapshots are authoritative, including dynamic search and RSS; legacy fallback is for unconfigured environments. Saving creates a draft revision; publish copies it to the public snapshot. Version conflicts require reload and reconciliation. Archive/unpublish hides the snapshot; revisions remain available to officers.
 

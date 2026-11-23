@@ -27,6 +27,13 @@ test('officer workflow through real admin handlers and an isolated mock Supabase
     }
     if (url.pathname === '/auth/v1/user') return req.headers.authorization === 'Bearer valid-access' ? reply({ id: 'officer' }) : reply({}, 401)
     if (url.pathname === '/rest/v1/rpc/archives_is_officer') return reply(officer && req.headers.authorization === 'Bearer valid-access')
+    if (url.pathname === '/functions/v1/archives-read-asset' && req.method === 'POST') {
+      if (req.headers.authorization !== 'Bearer test-anon-key') return reply({}, 401)
+      const asset = uploads.find((entry) => entry.path === json().path)
+      if (!item?.published || !asset || !manifest.includes(asset.path)) return reply({}, 404)
+      res.writeHead(200, { 'content-type': asset.type })
+      return res.end(asset.raw)
+    }
     // Simulate private data access, independently of the handler's guard.
     if (req.headers.authorization !== 'Bearer valid-access' || !officer) return reply({ message: 'Forbidden' }, 403)
     if (url.pathname === '/rest/v1/archive_items') return reply(item && (!url.searchParams.has('id') || url.searchParams.get('id') === `eq.${item.id}`) ? [item] : [])
@@ -90,8 +97,14 @@ test('officer workflow through real admin handlers and an isolated mock Supabase
   const content = { title: 'Original', slug: 'original', date: '', quarter: '', tags: [], summary: '', coverImage: canonical, videoUrl: '', slidesUrl: '', body: `![cover](${canonical})\n\n[document](${secondUrl})\n\n\`${canonical}\`\n\n[bad](${canonical}&extra=1)`, description: '', type: '', url: '' }
   let current = await result(await post('save', { kind: 'event', content }))
   assert.equal(current.version, 1); assert.equal(current.published, null)
+  assert.equal((await get(canonical, '')).status, 404)
   current = await result(await post('publish', { id: current.id, version: current.version }))
   assert.deepEqual(manifest, [uploaded.path, second]); assert.equal(current.status, 'published'); assert.deepEqual(current.published, content)
+  const served = await get(canonical, '')
+  assert.equal(served.status, 200)
+  assert.equal(served.headers.get('content-type'), 'image/png')
+  assert.match(served.headers.get('cache-control'), /no-store/)
+  assert.deepEqual(new Uint8Array(await served.arrayBuffer()), png)
   const originalPublished = copy(current.published)
   current = await result(await post('save', { id: current.id, version: current.version, kind: 'event', content: { ...content, title: 'Edited draft' } }))
   assert.equal(current.draft.title, 'Edited draft'); assert.deepEqual(current.published, originalPublished)
@@ -102,6 +115,7 @@ test('officer workflow through real admin handlers and an isolated mock Supabase
   assert.deepEqual(current.draft, content); assert.deepEqual(current.published, originalPublished)
   current = await result(await post('status', { id: current.id, version: current.version, status: 'draft' }))
   assert.equal(current.status, 'draft'); assert.equal(current.published, null)
+  assert.equal((await get(canonical, '')).status, 404)
   current = await result(await post('status', { id: current.id, version: current.version, status: 'archived' }))
   assert.equal(current.status, 'archived'); assert.equal(current.published, null)
   history = await result(await get(`/api/admin/history?id=${current.id}`))
