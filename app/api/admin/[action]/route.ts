@@ -193,8 +193,10 @@ export async function POST(
       args = { input_id: input.id, revision_id: input.revisionId, expected_version: version }
     } else return json({ error: 'Invalid action' }, 400)
     const result = await client.rpc(name, args)
-    if (result.error)
-      return json({ error: result.error.message }, result.error.code === '40001' ? 409 : 400)
+    if (result.error) {
+      const conflict = result.error.code === 'PT409' || result.error.code === '40001'
+      return json({ error: result.error.message }, conflict ? 409 : 400)
+    }
     return json(result.data)
   } catch (error) {
     return failure(error)

@@ -44,7 +44,7 @@ test('officer workflow through real admin handlers and an isolated mock Supabase
     if (!url.pathname.startsWith('/rest/v1/rpc/archives_')) return reply({}, 404)
     if (action !== 'archives_save' || args.input_id) {
       if (!item || args.input_id !== item.id) return reply({ message: 'Not found' }, 404)
-      if (args.expected_version !== item.version) return reply({ message: 'Version conflict', code: '40001' }, 400)
+      if (args.expected_version !== item.version) return reply({ message: 'Version conflict', code: 'PT409' }, 409)
     }
     let revisionAction
     if (action === 'archives_save') {
@@ -108,7 +108,10 @@ test('officer workflow through real admin handlers and an isolated mock Supabase
   const originalPublished = copy(current.published)
   current = await result(await post('save', { id: current.id, version: current.version, kind: 'event', content: { ...content, title: 'Edited draft' } }))
   assert.equal(current.draft.title, 'Edited draft'); assert.deepEqual(current.published, originalPublished)
-  await result(await post('save', { id: current.id, version: 1, kind: 'event', content }), 409)
+  assert.deepEqual(
+    await result(await post('save', { id: current.id, version: 1, kind: 'event', content }), 409),
+    { error: 'Version conflict' }
+  )
   let history = await result(await get(`/api/admin/history?id=${current.id}`))
   assert.deepEqual(history.map((r) => r.action), ['save', 'publish', 'save'])
   current = await result(await post('restore', { id: current.id, version: current.version, revisionId: history.at(-1).id }))

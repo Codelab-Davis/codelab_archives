@@ -33,9 +33,11 @@ select public.test_assert((select count(*)=1 from public.archive_revisions), 'sa
 select public.archives_publish(id,version) from fixture;
 update fixture set version=2;
 select public.archives_save(id,'event','{"title":"Secret draft","slug":"changed","date":"","quarter":"","tags":[],"summary":"","coverImage":"","videoUrl":"","slidesUrl":"","body":"","description":"","type":"","url":""}',version) from fixture;
-do $$ begin perform public.archives_publish((select id from fixture),2); raise exception 'stale publish succeeded'; exception when serialization_failure then null; end $$;
+do $$ begin perform public.archives_publish((select id from fixture),2); raise exception 'stale publish succeeded'; exception when sqlstate 'PT409' then null; end $$;
 do $$ begin perform public.archives_save((select id from fixture),'event','{}',2); raise exception 'invalid save succeeded'; exception when invalid_parameter_value then null; end $$;
-do $$ begin perform public.archives_save((select id from fixture),'event',(select draft from public.archive_items limit 1),2); raise exception 'stale save succeeded'; exception when serialization_failure then null; end $$;
+do $$ begin perform public.archives_save((select id from fixture),'event',(select draft from public.archive_items limit 1),2); raise exception 'stale save succeeded'; exception when sqlstate 'PT409' then null; end $$;
+do $$ begin perform public.archives_set_status((select id from fixture),'archived',2); raise exception 'stale status succeeded'; exception when sqlstate 'PT409' then null; end $$;
+do $$ begin perform public.archives_restore((select id from fixture),(select id from public.archive_revisions where version=1),2); raise exception 'stale restore succeeded'; exception when sqlstate 'PT409' then null; end $$;
 select public.test_assert((select count(*)=3 from public.archive_revisions), 'conflicts create no revisions');
 select public.archives_restore(f.id,r.id,3) from fixture f join public.archive_revisions r on r.item_id=f.id and r.version=1;
 select public.test_assert((select version=4 and draft->>'title'='Public' and published->>'title'='Public' from public.archive_items), 'restore creates a new draft revision without republishing');
